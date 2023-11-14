@@ -56,8 +56,17 @@ To programmatically edit the converted Canva template, you can use a templating 
    # Save or use the rendered HTML
 
 ## Extending Functionality
+
 - **Custom CSS and JS:** You can add additional CSS or JavaScript to the generated HTML to further customize the design.
+
 - **Automating with APIs:** Consider integrating with APIs to automate the fetching and updating of content within the template.
+
+- **Templating with Jinja:** Make the converted HTML templates dynamic by integrating Jinja templating. This allows for the easy insertion of variables and conditions into the HTML, making the templates adaptable and reusable for various applications.
+
+- **Integration with Puppeteer or Similar Tools:** Utilize tools like Puppeteer, a Node library which provides a high-level API over the Chrome or Chromium browser, to further extend the capabilities of this project. With Puppeteer, you can:
+    - **Generate Images or PDFs:** Automatically capture screenshots or generate PDFs of the rendered HTML.
+    - **Video Generation:** Go a step further by using Puppeteer to create videos of the HTML page.
+
 
 ## Contributing
 Contributions to the project are welcome! Please follow the standard fork and pull request workflow.
