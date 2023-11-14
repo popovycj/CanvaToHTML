@@ -45,6 +45,7 @@ class FontExtractor:
         'Italic': 'italic',
         'Normal': 'normal'
     }
+    FONT_FORMATS = ['woff2', 'ttf', 'woff']
 
     def __init__(self, html_content):
         self.html_content = html_content
@@ -79,7 +80,7 @@ class FontExtractor:
         font_family_encoded = font_family.replace(' ', '/')
         font_links = []
 
-        pattern = re.compile(rf"{re.escape(self.FONT_BASE_URL + font_family_encoded)}/[^\s/]+\.(woff2|ttf)")
+        pattern = re.compile(rf"{re.escape(self.FONT_BASE_URL + font_family_encoded)}/[^\s/]+\.({'|'.join(self.FONT_FORMATS)})")
 
         for match in pattern.finditer(self.html_content):
             href = match.group(0)
