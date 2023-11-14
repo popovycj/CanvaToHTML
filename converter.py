@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import undetected_chromedriver as uc
 import tinycss2
+import argparse
 
 class WebDriverManager:
     def __init__(self, url):
@@ -217,5 +218,20 @@ class CanvaConverter:
 
 
 if __name__ == '__main__':
-    converter = CanvaConverter('<PATH_TO_COOKIES_FILE>.json', 'https://www.canva.com/design/<TEMPLATE_ID>/edit')
+    parser = argparse.ArgumentParser(description='Convert Canva design to HTML.')
+
+    parser.add_argument('--cookies', help='Path to the cookies file', default=None)
+    parser.add_argument('--url', help='URL of the Canva design', default=None)
+
+    parser.add_argument('positional_args', nargs='*', help='Positional arguments: cookies_file url')
+
+    args = parser.parse_args()
+
+    cookies_file = args.cookies if args.cookies else (args.positional_args[0] if args.positional_args else None)
+    url = args.url if args.url else (args.positional_args[1] if len(args.positional_args) > 1 else None)
+
+    if not cookies_file or not url:
+        parser.error("Both cookies file and URL are required.")
+
+    converter = CanvaConverter(cookies_file, url)
     converter.perform()
