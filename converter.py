@@ -3,6 +3,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 import undetected_chromedriver as uc
+import tinycss2
 
 class WebDriverManager:
     def __init__(self, url):
@@ -131,6 +132,41 @@ class BlobToSVGConverter:
 
         return str(soup)
 
+class CSSOptimizer:
+    def __init__(self, html_content, css_content):
+        self.html_content = html_content
+        self.css_content = css_content
+
+    def get_html_selectors(self):
+        soup = BeautifulSoup(self.html_content, 'html.parser')
+        selectors = set()
+        for element in soup.find_all(True):
+            selectors.add(element.name)
+            for class_ in element.get("class", []):
+                selectors.add(f".{class_}")
+            for id_ in element.get("id", []):
+                selectors.add(f"#{id_}")
+        return selectors
+
+    def get_css_rules(self):
+        rules = tinycss2.parse_stylesheet(self.css_content, skip_comments=True)
+        return [rule for rule in rules if rule.type == 'qualified-rule']
+
+    def filter_css_rules(self, css_rules, html_selectors):
+        optimized_rules = []
+        for rule in css_rules:
+            prelude = tinycss2.serialize(rule.prelude)
+            content = tinycss2.serialize(rule.content)
+            if any(selector in prelude for selector in html_selectors):
+                optimized_rules.append(prelude + ' {' + content + '}')
+        return optimized_rules
+
+    def optimize(self):
+        html_selectors = self.get_html_selectors()
+        css_rules = self.get_css_rules()
+        optimized_rules = self.filter_css_rules(css_rules, html_selectors)
+        return '\n'.join(optimized_rules)
+
 class CanvaConverter:
     CSS_URL = 'https://static.canva.com/web/36b99f3659b2c9ed.ltr.css'
     TEMPLATE_SELECTOR = '.uPeMFQ'
@@ -167,14 +203,17 @@ class CanvaConverter:
             f.write(new_html_content)
 
     def perform(self):
-        full_html_content = self.grab_html()
+        full_html_content     = self.grab_html()
         selected_html_content = self.grab_selected_html()
-        font_extractor = FontExtractor(full_html_content)
-        font_face_rules = font_extractor.extract_font_face_rules()
-        css_content = self.download_css()
+        font_extractor        = FontExtractor(full_html_content)
+        font_face_rules       = font_extractor.extract_font_face_rules()
+        css_content           = self.download_css()
         blob_to_svg_converter = BlobToSVGConverter(self.driver_manager.driver)
-        html_with_svg = blob_to_svg_converter.replace_images_with_svg(selected_html_content)
-        self.parse_and_create_new_html(html_with_svg, css_content, font_face_rules)
+        html_with_svg         = blob_to_svg_converter.replace_images_with_svg(selected_html_content)
+        css_optimizer         = CSSOptimizer(selected_html_content, css_content)
+        optimized_css         = css_optimizer.optimize()
+
+        self.parse_and_create_new_html(html_with_svg, optimized_css, font_face_rules)
 
 
 if __name__ == '__main__':
