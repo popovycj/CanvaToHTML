@@ -30,7 +30,7 @@ This Python project enables users to convert Canva templates into HTML and CSS c
    - The cookies should be in a JSON format.
 2. **Run the Converter:**
    ```bash
-   python converter.py --cookies path/to/cookies.json --url "https://www.canva.com/design/[designID]/"
+   python3 converter.py --cookies path/to/cookies.json --url "https://www.canva.com/design/[designID]/"
 
 ### Using with Jinja Templating
 
@@ -49,10 +49,10 @@ To programmatically edit the converted Canva template, you can use a templating 
    # Load your template
    with open('path/to/generated_template.html') as file:
        template = Template(file.read())
-  
+
    # Render the template with your variables
    rendered_html = template.render(my_variable="Dynamic Content")
-  
+
    # Save or use the rendered HTML
 
 ## Extending Functionality
@@ -70,7 +70,3 @@ To programmatically edit the converted Canva template, you can use a templating 
 
 ## Contributing
 Contributions to the project are welcome! Please follow the standard fork and pull request workflow.
-
-
-
-

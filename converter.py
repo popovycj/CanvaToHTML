@@ -6,27 +6,6 @@ import undetected_chromedriver as uc
 import tinycss2
 import argparse
 
-class WebDriverManager:
-    def __init__(self, url):
-        self.url = url
-        self.driver = self._initialize_driver()
-
-    def _initialize_driver(self):
-        options = uc.ChromeOptions()
-        options.headless = False
-        return uc.Chrome(use_subprocess=True, options=options)
-
-    def add_cookies(self, cookies):
-        self.driver.get(self.url)
-        for cookie in cookies:
-            if cookie.get('sameSite', '') == 'no_restriction':
-                cookie['sameSite'] = 'None'
-            self.driver.add_cookie(cookie)
-        self.driver.refresh()
-        self.driver.implicitly_wait(20)
-
-    def get_page_source(self):
-        return self.driver.page_source
 
 class FontExtractor:
     FONT_BASE_URL = 'https://font-public.canva.com/'
@@ -173,22 +152,16 @@ class CanvaConverter:
     CSS_URL = 'https://static.canva.com/web/36b99f3659b2c9ed.ltr.css'
     TEMPLATE_SELECTOR = '.uPeMFQ'
 
-    def __init__(self, cookies_file, url):
-        self.cookies_file = cookies_file
+    def __init__(self, driver, url):
+        self.driver = driver
         self.url = url
-        self.driver_manager = WebDriverManager(url)
-        self.load_cookies()
-
-    def load_cookies(self):
-        with open(self.cookies_file, 'r') as f:
-            cookies = json.load(f)
-        self.driver_manager.add_cookies(cookies)
 
     def grab_html(self):
-        return self.driver_manager.get_page_source()
+        self.driver.get(self.url)
+        self.driver.implicitly_wait(20)
+        return self.driver.page_source
 
-    def grab_selected_html(self):
-        page_source = self.driver_manager.get_page_source()
+    def grab_selected_html(self, page_source):
         soup = BeautifulSoup(page_source, 'html.parser')
         element = soup.select_one(self.TEMPLATE_SELECTOR)
         return str(element) if element else ''
@@ -206,11 +179,11 @@ class CanvaConverter:
 
     def perform(self):
         full_html_content     = self.grab_html()
-        selected_html_content = self.grab_selected_html()
+        selected_html_content = self.grab_selected_html(full_html_content)
         font_extractor        = FontExtractor(full_html_content)
         font_face_rules       = font_extractor.extract_font_face_rules()
         css_content           = self.download_css()
-        blob_to_svg_converter = BlobToSVGConverter(self.driver_manager.driver)
+        blob_to_svg_converter = BlobToSVGConverter(self.driver)
         html_with_svg         = blob_to_svg_converter.replace_images_with_svg(selected_html_content)
         css_optimizer         = CSSOptimizer(selected_html_content, css_content)
         optimized_css         = css_optimizer.optimize()
@@ -218,21 +191,42 @@ class CanvaConverter:
         self.parse_and_create_new_html(html_with_svg, optimized_css, font_face_rules)
 
 
-if __name__ == '__main__':
+def parse_and_validate_arguments():
     parser = argparse.ArgumentParser(description='Convert Canva design to HTML.')
-
-    parser.add_argument('--cookies', help='Path to the cookies file', default=None)
-    parser.add_argument('--url', help='URL of the Canva design', default=None)
-
-    parser.add_argument('positional_args', nargs='*', help='Positional arguments: cookies_file url')
-
+    parser.add_argument('--cookies', help='Path to the cookies file', required=True)
+    parser.add_argument('--url', help='URL of the Canva design', required=True)
     args = parser.parse_args()
 
-    cookies_file = args.cookies if args.cookies else (args.positional_args[0] if args.positional_args else None)
-    url = args.url if args.url else (args.positional_args[1] if len(args.positional_args) > 1 else None)
+    return args.cookies, args.url
 
-    if not cookies_file or not url:
-        parser.error("Both cookies file and URL are required.")
+def initialize_driver():
+    options = uc.ChromeOptions()
+    options.headless = False
+    return uc.Chrome(use_subprocess=True, options=options)
 
-    converter = CanvaConverter(cookies_file, url)
+def load_cookies(driver, cookies_file, url):
+    driver.get(url)
+
+    try:
+        with open(cookies_file, 'r') as f:
+            cookies = json.load(f)
+    except FileNotFoundError:
+        driver.quit()
+        print(f"Error: The file '{cookies_file}' was not found.")
+        exit(1)
+
+    for cookie in cookies:
+        if cookie.get('sameSite', '') == 'no_restriction':
+            cookie['sameSite'] = 'None'
+        driver.add_cookie(cookie)
+
+
+if __name__ == '__main__':
+    cookies_file, url = parse_and_validate_arguments()
+    driver = initialize_driver()
+    load_cookies(driver, cookies_file, 'https://www.canva.com/')
+
+    converter = CanvaConverter(driver, url)
     converter.perform()
+
+    driver.quit()
