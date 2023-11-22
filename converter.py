@@ -88,30 +88,41 @@ class BlobToSVGConverter:
     def __init__(self, driver):
         self.driver = driver
 
-    def replace_images_with_svg(self, html_content):
+    def replace_images_with_svg_or_base64(self, html_content):
         soup = BeautifulSoup(html_content, 'html.parser')
         img_tags = soup.find_all('img', src=re.compile(self.BLOB_URL_PATTERN))
-        print(img_tags)
 
         for img in img_tags:
             blob_url = img['src']
-            script = f"""
-                var callback = arguments[arguments.length - 1];
-                fetch("{blob_url}")
-                    .then(response => response.text())
-                    .then(text => callback(text))
-                    .catch(error => callback('Error: ' + error.message));
-            """
-            svg_content = self.driver.execute_async_script(script)
-            print(svg_content)
-            print("*" * 50)
-            svg_soup = BeautifulSoup(svg_content, 'html.parser')
-            svg = svg_soup.find('svg')
+            content, is_svg = self._fetch_blob_content(blob_url)
 
-            if svg:
-                img.replace_with(svg)
+            if is_svg:
+                svg_soup = BeautifulSoup(content, 'html.parser')
+                svg = svg_soup.find('svg')
+                if svg:
+                    img.replace_with(svg)
+            else:
+                img['src'] = content
 
         return str(soup)
+
+    def _fetch_blob_content(self, blob_url):
+        script = f"""
+            var callback = arguments[arguments.length - 1];
+            fetch("{blob_url}")
+                .then(response => response.blob())
+                .then(blob => {{
+                    var reader = new FileReader();
+                    reader.onloadend = () => callback([reader.result, blob.type === 'image/svg+xml']);
+                    if (blob.type === 'image/svg+xml') {{
+                        reader.readAsText(blob);
+                    }} else {{
+                        reader.readAsDataURL(blob);
+                    }}
+                }})
+                .catch(error => callback(['Error: ' + error.message, false]));
+        """
+        return self.driver.execute_async_script(script)
 
 class CSSOptimizer:
     def __init__(self, html_content, css_content):
@@ -184,7 +195,7 @@ class CanvaConverter:
         font_face_rules       = font_extractor.extract_font_face_rules()
         css_content           = self.download_css()
         blob_to_svg_converter = BlobToSVGConverter(self.driver)
-        html_with_svg         = blob_to_svg_converter.replace_images_with_svg(selected_html_content)
+        html_with_svg         = blob_to_svg_converter.replace_images_with_svg_or_base64(selected_html_content)
         css_optimizer         = CSSOptimizer(selected_html_content, css_content)
         optimized_css         = css_optimizer.optimize()
 
